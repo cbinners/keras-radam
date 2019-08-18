@@ -63,6 +63,8 @@ class RAdamAccumulator(keras.optimizers.Optimizer):
         self.initial_weight_decay = weight_decay
         self.initial_total_steps = total_steps
         self.amsgrad = amsgrad
+        self.accum_iters = K.variable(accum_iters, K.dtype(self.iterations))
+        self.accum_iters_float = K.cast(self.accum_iters, K.floatx())
 
     def get_updates(self, loss, params):
         grads = self.get_gradients(loss, params)
@@ -70,12 +72,16 @@ class RAdamAccumulator(keras.optimizers.Optimizer):
 
         lr = self.lr
 
+        completed_updates = K.cast(
+            K.tf.floordiv(self.iterations, self.accum_iters), K.floatx()
+        )
+
         if self.initial_decay > 0:
             lr = lr * (
                 1.0 / (1.0 + self.decay * K.cast(self.iterations, K.dtype(self.decay)))
             )
 
-        t = K.cast(self.iterations, K.floatx()) + 1
+        t = completed_updates + 1
 
         if self.initial_total_steps > 0:
             warmup_steps = self.total_steps * self.warmup_proportion
